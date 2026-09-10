@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from typing import List, Optional
-from database import SessionLocal, Foerderung, Base, engine
+import bcrypt
+from database import SessionLocal, Foerderung, Admin, Base, engine
 
 app = FastAPI(title="Förderungs-API")
 
@@ -14,19 +16,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ===== SICHERHEIT =====
+security = HTTPBasic()
+
+def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    db = SessionLocal()
+    admin = db.query(Admin).filter(Admin.username == credentials.username).first()
+    db.close()
+    
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Falscher Benutzername oder Passwort",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    
+    # Passwort prüfen (bcrypt direkt)
+    password_bytes = credentials.password.encode('utf-8')
+    hash_bytes = admin.password_hash.encode('utf-8')
+    
+    if not bcrypt.checkpw(password_bytes, hash_bytes):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Falscher Benutzername oder Passwort",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
 # ===== DATENBANK BEIM START INITIALISIEREN =====
 @app.on_event("startup")
 def startup_event():
-    # Tabellen erstellen (falls nicht vorhanden)
     Base.metadata.create_all(bind=engine)
-    
-    # Prüfen, ob Daten vorhanden sind
     db = SessionLocal()
     count = db.query(Foerderung).count()
     db.close()
     
     if count == 0:
-        # Datenbank befüllen
         from seed_data import seed_database
         seed_database()
         print("✅ Datenbank wurde automatisch befüllt!")
@@ -46,7 +71,15 @@ class FoerderungRequest(BaseModel):
     massnahme: str
     gebaeudetyp: str
 
-# ===== ENDPUNKTE =====
+class FoerderungCreate(BaseModel):
+    name: str
+    massnahme: str
+    gebaeudetyp: str
+    zuschuss: str
+    details: str
+    max_foerderung: Optional[float] = None
+
+# ===== ÖFFENTLICHE ENDPUNKTE =====
 
 @app.get("/")
 def read_root():
@@ -59,13 +92,6 @@ def get_all_foerderungen():
     db.close()
     return result
 
-@app.get("/admin/seed")
-def admin_seed():
-    """Manuelles Befüllen der Datenbank"""
-    from seed_data import seed_database
-    seed_database()
-    return {"message": "Datenbank wurde befüllt!"}
-
 @app.post("/foerderungen/check", response_model=List[FoerderungResponse])
 def check_foerderung(request: FoerderungRequest):
     db = SessionLocal()
@@ -75,11 +101,63 @@ def check_foerderung(request: FoerderungRequest):
     ).all()
     db.close()
 
-    
-
     if not result:
         raise HTTPException(status_code=404, detail="Keine Förderungen gefunden.")
     return result
+
+# ===== ADMIN-ENDPUNKTE (nur mit Login) =====
+
+@app.get("/admin/foerderungen", response_model=List[FoerderungResponse])
+def admin_get_all(username: str = Depends(verify_admin)):
+    """Alle Förderungen (Admin)"""
+    db = SessionLocal()
+    result = db.query(Foerderung).all()
+    db.close()
+    return result
+
+@app.post("/admin/foerderungen", response_model=FoerderungResponse)
+def admin_create_foerderung(data: FoerderungCreate, username: str = Depends(verify_admin)):
+    """Neue Förderung anlegen (Admin)"""
+    db = SessionLocal()
+    foerderung = Foerderung(**data.dict())
+    db.add(foerderung)
+    db.commit()
+    db.refresh(foerderung)
+    db.close()
+    return foerderung
+
+@app.put("/admin/foerderungen/{foerderung_id}", response_model=FoerderungResponse)
+def admin_update_foerderung(foerderung_id: int, data: FoerderungCreate, username: str = Depends(verify_admin)):
+    """Förderung bearbeiten (Admin)"""
+    db = SessionLocal()
+    foerderung = db.query(Foerderung).filter(Foerderung.id == foerderung_id).first()
+    
+    if not foerderung:
+        db.close()
+        raise HTTPException(status_code=404, detail="Förderung nicht gefunden.")
+    
+    for key, value in data.dict().items():
+        setattr(foerderung, key, value)
+    
+    db.commit()
+    db.refresh(foerderung)
+    db.close()
+    return foerderung
+
+@app.delete("/admin/foerderungen/{foerderung_id}")
+def admin_delete_foerderung(foerderung_id: int, username: str = Depends(verify_admin)):
+    """Förderung löschen (Admin)"""
+    db = SessionLocal()
+    foerderung = db.query(Foerderung).filter(Foerderung.id == foerderung_id).first()
+    
+    if not foerderung:
+        db.close()
+        raise HTTPException(status_code=404, detail="Förderung nicht gefunden.")
+    
+    db.delete(foerderung)
+    db.commit()
+    db.close()
+    return {"message": f"Förderung {foerderung_id} wurde gelöscht."}
 
 if __name__ == "__main__":
     import uvicorn

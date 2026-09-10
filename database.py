@@ -21,5 +21,12 @@ class Foerderung(Base):
     max_foerderung = Column(Float, nullable=True)
     zuschuss = Column(String, nullable=True)
     details = Column(Text, nullable=True)
+    
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
 
 Base.metadata.create_all(bind=engine)
