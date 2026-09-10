@@ -31,7 +31,6 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
             headers={"WWW-Authenticate": "Basic"},
         )
     
-    # Passwort prüfen (bcrypt direkt)
     password_bytes = credentials.password.encode('utf-8')
     hash_bytes = admin.password_hash.encode('utf-8')
     
@@ -47,14 +46,35 @@ def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
 @app.on_event("startup")
 def startup_event():
     Base.metadata.create_all(bind=engine)
+    
+    # Förderungen prüfen und befüllen
     db = SessionLocal()
     count = db.query(Foerderung).count()
-    db.close()
     
     if count == 0:
         from seed_data import seed_database
         seed_database()
         print("✅ Datenbank wurde automatisch befüllt!")
+    
+    # Admin prüfen und anlegen
+    admin_count = db.query(Admin).count()
+    db.close()
+    
+    if admin_count == 0:
+        db = SessionLocal()
+        
+        username = "admin"
+        password = "architekt2026"
+        
+        password_bytes = password.encode('utf-8')
+        password_hash = bcrypt.hashpw(password_bytes, bcrypt.gensalt()).decode('utf-8')
+        
+        admin = Admin(username=username, password_hash=password_hash)
+        db.add(admin)
+        db.commit()
+        db.close()
+        
+        print(f"✅ Admin '{username}' automatisch angelegt!")
 
 # ===== MODELLE =====
 
