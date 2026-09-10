@@ -1,10 +1,8 @@
-# Server starten
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from database import SessionLocal, Foerderung
+from database import SessionLocal, Foerderung, Base, engine
 
 app = FastAPI(title="Förderungs-API")
 
@@ -15,6 +13,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ===== DATENBANK BEIM START INITIALISIEREN =====
+@app.on_event("startup")
+def startup_event():
+    # Tabellen erstellen (falls nicht vorhanden)
+    Base.metadata.create_all(bind=engine)
+    
+    # Prüfen, ob Daten vorhanden sind
+    db = SessionLocal()
+    count = db.query(Foerderung).count()
+    db.close()
+    
+    if count == 0:
+        # Datenbank befüllen
+        from seed_data import seed_database
+        seed_database()
+        print("✅ Datenbank wurde automatisch befüllt!")
+
+# ===== MODELLE =====
 
 class FoerderungResponse(BaseModel):
     id: int
@@ -28,6 +45,8 @@ class FoerderungResponse(BaseModel):
 class FoerderungRequest(BaseModel):
     massnahme: str
     gebaeudetyp: str
+
+# ===== ENDPUNKTE =====
 
 @app.get("/")
 def read_root():
