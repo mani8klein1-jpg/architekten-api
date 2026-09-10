@@ -59,6 +59,13 @@ def get_all_foerderungen():
     db.close()
     return result
 
+@app.get("/admin/seed")
+def admin_seed():
+    """Manuelles Befüllen der Datenbank"""
+    from seed_data import seed_database
+    seed_database()
+    return {"message": "Datenbank wurde befüllt!"}
+
 @app.post("/foerderungen/check", response_model=List[FoerderungResponse])
 def check_foerderung(request: FoerderungRequest):
     db = SessionLocal()
@@ -67,6 +74,8 @@ def check_foerderung(request: FoerderungRequest):
         Foerderung.gebaeudetyp == request.gebaeudetyp
     ).all()
     db.close()
+
+    
 
     if not result:
         raise HTTPException(status_code=404, detail="Keine Förderungen gefunden.")
