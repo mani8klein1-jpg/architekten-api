@@ -54,29 +54,40 @@ def seed_database():
             details="KfW-Förderung für Neubauten mit hohem Energieeffizienz-Standard.",
             max_foerderung=150000.0
         ),
-        # ===== NEU: Deine neuen Förderungen =====
-    Foerderung(
-        name="Fördermittelberatung Photovoltaik",
-        massnahme="photovoltaik",
-        gebaeudetyp="einfamilienhaus",
-        zuschuss="Individuell",
-        details="Beratung zu Fördermitteln für Photovoltaikanlagen.",
-        max_foerderung=1000.0
-    ),
-    Foerderung(
-        name="Fördermittelberatung Fassade",
-        massnahme="fassade",
-        gebaeudetyp="einfamilienhaus",
-        zuschuss="Individuell",
-        details="Beratung zu Fördermitteln für Fassadendämmung.",
-        max_foerderung=1500.0
-    ),
+        Foerderung(
+            name="Fördermittelberatung Photovoltaik",
+            massnahme="photovoltaik",
+            gebaeudetyp="einfamilienhaus",
+            zuschuss="Individuell",
+            details="Beratung zu Fördermitteln für Photovoltaikanlagen.",
+            max_foerderung=1000.0
+        ),
+        Foerderung(
+            name="Fördermittelberatung Fassade",
+            massnahme="fassade",
+            gebaeudetyp="einfamilienhaus",
+            zuschuss="Individuell",
+            details="Beratung zu Fördermitteln für Fassadendämmung.",
+            max_foerderung=1500.0
+        ),
     ]
 
-    db.add_all(foerderungen)
+    # Prüfen, welche Förderungen schon existieren
+    eingefuegt = 0
+    for foerderung in foerderungen:
+        exists = db.query(Foerderung).filter(
+            Foerderung.name == foerderung.name,
+            Foerderung.massnahme == foerderung.massnahme
+        ).first()
+        
+        if not exists:
+            db.add(foerderung)
+            eingefuegt += 1
+
     db.commit()
     db.close()
-    print("✅ Förderdaten erfolgreich eingefügt!")
+    
+    print(f"✅ {eingefuegt} neue Förderungen eingefügt!")
 
 if __name__ == "__main__":
     seed_database()
