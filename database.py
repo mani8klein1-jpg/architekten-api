@@ -21,12 +21,25 @@ class Foerderung(Base):
     max_foerderung = Column(Float, nullable=True)
     zuschuss = Column(String, nullable=True)
     details = Column(Text, nullable=True)
-    
+
 class Admin(Base):
     __tablename__ = "admins"
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+
+class Anfrage(Base):
+    __tablename__ = "anfragen"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    telefon = Column(String, nullable=True)
+    massnahme = Column(String, nullable=False)
+    gebaeudetyp = Column(String, nullable=False)
+    baujahr = Column(Integer, nullable=True)
+    ergebnis = Column(Text, nullable=True)
+    erstellt_am = Column(String, nullable=False)
 
 Base.metadata.create_all(bind=engine)

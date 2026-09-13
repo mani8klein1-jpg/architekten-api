@@ -4,7 +4,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 import bcrypt
-from database import SessionLocal, Foerderung, Admin, Base, engine
+from database import SessionLocal, Foerderung, Admin, Anfrage, Base, engine
 
 app = FastAPI(title="Förderungs-API")
 
@@ -99,6 +99,26 @@ class FoerderungCreate(BaseModel):
     details: str
     max_foerderung: Optional[float] = None
 
+class AnfrageCreate(BaseModel):
+    name: str
+    email: str
+    telefon: Optional[str] = None
+    massnahme: str
+    gebaeudetyp: str
+    baujahr: Optional[int] = None
+    ergebnis: Optional[str] = None
+
+class AnfrageResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    telefon: Optional[str] = None
+    massnahme: str
+    gebaeudetyp: str
+    baujahr: Optional[int] = None
+    ergebnis: Optional[str] = None
+    erstellt_am: str    
+
 # ===== ÖFFENTLICHE ENDPUNKTE =====
 
 @app.get("/")
@@ -178,6 +198,53 @@ def admin_delete_foerderung(foerderung_id: int, username: str = Depends(verify_a
     db.commit()
     db.close()
     return {"message": f"Förderung {foerderung_id} wurde gelöscht."}
+
+# ===== ANFRAGEN =====
+
+@app.post("/anfragen", response_model=AnfrageResponse)
+def create_anfrage(data: AnfrageCreate):
+    """Neue Anfrage speichern (öffentlich)"""
+    from datetime import datetime
+    
+    db = SessionLocal()
+    anfrage = Anfrage(
+        name=data.name,
+        email=data.email,
+        telefon=data.telefon,
+        massnahme=data.massnahme,
+        gebaeudetyp=data.gebaeudetyp,
+        baujahr=data.baujahr,
+        ergebnis=data.ergebnis,
+        erstellt_am=datetime.now().strftime("%d.%m.%Y %H:%M")
+    )
+    db.add(anfrage)
+    db.commit()
+    db.refresh(anfrage)
+    db.close()
+    return anfrage
+
+@app.get("/admin/anfragen", response_model=List[AnfrageResponse])
+def admin_get_anfragen(username: str = Depends(verify_admin)):
+    """Alle Anfragen (Admin)"""
+    db = SessionLocal()
+    result = db.query(Anfrage).order_by(Anfrage.id.desc()).all()
+    db.close()
+    return result
+
+@app.delete("/admin/anfragen/{anfrage_id}")
+def admin_delete_anfrage(anfrage_id: int, username: str = Depends(verify_admin)):
+    """Anfrage löschen (Admin)"""
+    db = SessionLocal()
+    anfrage = db.query(Anfrage).filter(Anfrage.id == anfrage_id).first()
+    
+    if not anfrage:
+        db.close()
+        raise HTTPException(status_code=404, detail="Anfrage nicht gefunden.")
+    
+    db.delete(anfrage)
+    db.commit()
+    db.close()
+    return {"message": f"Anfrage {anfrage_id} wurde gelöscht."}
 
 if __name__ == "__main__":
     import uvicorn
