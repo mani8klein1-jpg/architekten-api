@@ -54,6 +54,23 @@ def seed_database():
             details="KfW-Förderung für Neubauten mit hohem Energieeffizienz-Standard.",
             max_foerderung=150000.0
         ),
+        # ===== NEU: Deine neuen Förderungen =====
+    Foerderung(
+        name="Fördermittelberatung Photovoltaik",
+        massnahme="photovoltaik",
+        gebaeudetyp="einfamilienhaus",
+        zuschuss="Individuell",
+        details="Beratung zu Fördermitteln für Photovoltaikanlagen.",
+        max_foerderung=1000.0
+    ),
+    Foerderung(
+        name="Fördermittelberatung Fassade",
+        massnahme="fassade",
+        gebaeudetyp="einfamilienhaus",
+        zuschuss="Individuell",
+        details="Beratung zu Fördermitteln für Fassadendämmung.",
+        max_foerderung=1500.0
+    ),
     ]
 
     db.add_all(foerderungen)
